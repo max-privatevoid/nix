@@ -433,6 +433,7 @@ EvalState::EvalState(
     , sPrefix(symbols.create("prefix"))
     , repair(NoRepair)
     , emptyBindings(0)
+    , rootFS(makeFSInputAccessor(""))
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , regexCache(makeRegexCache())
@@ -517,6 +518,7 @@ void EvalState::allowPath(const StorePath & storePath)
         allowedPaths->insert(store->toRealPath(storePath));
 }
 
+#if 0
 Path EvalState::checkSourcePath(const Path & path_)
 {
     if (!allowedPaths) return path_;
@@ -562,6 +564,7 @@ Path EvalState::checkSourcePath(const Path & path_)
 
     throw RestrictedPathError("access to canonical path '%1%' is forbidden in restricted mode", path);
 }
+#endif
 
 
 void EvalState::checkURI(const std::string & uri)
@@ -583,12 +586,14 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        checkSourcePath(uri);
+        // FIXME: use rootPath
+        //checkSourcePath(uri);
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        checkSourcePath(std::string(uri, 7));
+        // FIXME: use rootPath
+        //checkSourcePath(std::string(uri, 7));
         return;
     }
 
@@ -977,17 +982,23 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
+void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial)
 {
+    #if 0
     auto path = checkSourcePath(path_);
+    #endif
 
+    auto path = packPath(path_);
+
+    // FIXME: use SourcePath as cache key
     FileEvalCache::iterator i;
     if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
-    Path resolvedPath = resolveExprPath(path);
+    auto resolvedPath_ = resolveExprPath(path_);
+    auto resolvedPath = packPath(resolvedPath_);
     if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
         v = i->second;
         return;
@@ -1001,7 +1012,10 @@ void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
         e = j->second;
 
     if (!e)
+        e = parseExprFromFile(resolvedPath_);
+        #if 0
         e = parseExprFromFile(checkSourcePath(resolvedPath));
+        #endif
 
     cacheFile(path, resolvedPath, e, v, mustBeTrivial);
 }
@@ -2027,9 +2041,19 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     if (i != srcToStore.end())
         dstPath = store->printStorePath(i->second);
     else {
+        // FIXME: use SourcePath
+        printError("COPY %s", path);
+        auto path2 = unpackPath(path);
+        #if 0
         auto p = settings.readOnlyMode
-            ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
-            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+            ? store->computeStorePathForPath(std::string(baseNameOf(path)), canonPath(path)).first
+            : store->addToStore(std::string(baseNameOf(path)), canonPath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+        #endif
+        auto source = sinkToSource([&](Sink & sink) {
+            path2.accessor->dumpPath(path2.path, sink);
+        });
+        // FIXME: readOnlyMode
+        auto p = store->addToStoreFromDump(*source, std::string(baseNameOf(path)), FileIngestionMethod::Recursive, htSHA256, repair);
         dstPath = store->printStorePath(p);
         allowPath(p);
         srcToStore.insert_or_assign(path, std::move(p));

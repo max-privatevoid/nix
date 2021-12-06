@@ -7,6 +7,7 @@
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
+#include "input-accessor.hh"
 
 #include <map>
 #include <optional>
@@ -20,6 +21,7 @@ namespace nix {
 class Store;
 class EvalState;
 class StorePath;
+struct SourcePath;
 enum RepairFlag : bool;
 
 
@@ -95,6 +97,10 @@ public:
 
     Bindings emptyBindings;
 
+    ref<InputAccessor> rootFS;
+
+    std::unordered_map<size_t, ref<InputAccessor>> inputAccessors;
+
     /* Store used to materialise .drv files. */
     const ref<Store> store;
 
@@ -154,16 +160,18 @@ public:
 
     SearchPath getSearchPath() { return searchPath; }
 
+    Path packPath(const SourcePath & path);
+
+    SourcePath unpackPath(const Path & path);
+
+    SourcePath rootPath(const Path & path);
+
     /* Allow access to a path. */
     void allowPath(const Path & path);
 
     /* Allow access to a store path. Note that this gets remapped to
        the real store path if `store` is a chroot store. */
     void allowPath(const StorePath & storePath);
-
-    /* Check whether access to a path is allowed and throw an error if
-       not. Otherwise return the canonicalised path. */
-    Path checkSourcePath(const Path & path);
 
     void checkURI(const std::string & uri);
 
@@ -177,8 +185,8 @@ public:
     Path toRealPath(const Path & path, const PathSet & context);
 
     /* Parse a Nix expression from the specified file. */
-    Expr * parseExprFromFile(const Path & path);
-    Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
+    Expr * parseExprFromFile(const SourcePath & path);
+    Expr * parseExprFromFile(const SourcePath & path, StaticEnv & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv);
@@ -189,7 +197,7 @@ public:
     /* Evaluate an expression read from the given file to normal
        form. Optionally enforce that the top-level expression is
        trivial (i.e. doesn't require arbitrary computation). */
-    void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
+    void evalFile(const SourcePath & path, Value & v, bool mustBeTrivial = false);
 
     /* Like `cacheFile`, but with an already parsed expression. */
     void cacheFile(
@@ -267,6 +275,7 @@ public:
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
+    // FIXME: return SourcePath
     Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
 public:
@@ -422,7 +431,7 @@ string showType(const Value & v);
 std::pair<string, string> decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
-Path resolveExprPath(Path path);
+SourcePath resolveExprPath(const SourcePath & path);
 
 struct InvalidPathError : EvalError
 {
