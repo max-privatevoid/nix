@@ -98,6 +98,7 @@ public:
     Bindings emptyBindings;
 
     ref<InputAccessor> rootFS;
+    ref<MemoryInputAccessor> corepkgsFS;
 
     std::unordered_map<size_t, ref<InputAccessor>> inputAccessors;
 
@@ -508,7 +509,5 @@ struct EvalSettings : Config
 };
 
 extern EvalSettings evalSettings;
-
-static const std::string corepkgsPrefix{"/__corepkgs__/"};
 
 }

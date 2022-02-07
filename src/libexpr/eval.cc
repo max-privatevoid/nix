@@ -434,6 +434,7 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(makeFSInputAccessor(""))
+    , corepkgsFS(makeMemoryInputAccessor())
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , regexCache(makeRegexCache())
@@ -481,6 +482,11 @@ EvalState::EvalState(
     }
 
     createBaseEnv();
+
+    corepkgsFS->addFile(
+        "/fetchurl.nix",
+        #include "fetchurl.nix.gen.hh"
+    );
 }
 
 
