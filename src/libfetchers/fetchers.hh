@@ -69,7 +69,14 @@ public:
 
     bool contains(const Input & other) const;
 
+    /* Fetch the input into the Nix store, returning the location in
+       the Nix store and the immutable input. */
     std::pair<Tree, Input> fetch(ref<Store> store) const;
+
+    /* Return an InputAccessor that allows access to files in the
+       input without copying it to the store. Also return a possibly
+       mutable input. */
+    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store) const;
 
     Input applyOverrides(
         std::optional<std::string> ref,
@@ -129,6 +136,8 @@ struct InputScheme
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
     virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
+
+    virtual std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input);
 
     virtual ref<InputAccessor> getAccessor()
     {

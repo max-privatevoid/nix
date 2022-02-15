@@ -208,7 +208,7 @@ static Flake getFlake(
         .originalRef = originalRef,
         .resolvedRef = resolvedRef,
         .lockedRef = lockedRef,
-        .sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
+        //.sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
     };
 
     if (!pathExists(flakeFile))
@@ -325,6 +325,7 @@ LockedFlake lockFlake(
         state.store->setOptions();
     }
 
+    #if 0
     try {
 
         // FIXME: symlink attack
@@ -668,6 +669,9 @@ LockedFlake lockFlake(
         e.addTrace({}, "while updating the lock file of flake '%s'", flake.lockedRef.to_string());
         throw;
     }
+    #endif
+
+    throw UnimplementedError("lockFlake");
 }
 
 void callFlake(EvalState & state,
@@ -682,13 +686,17 @@ void callFlake(EvalState & state,
 
     vLocks->mkString(lockedFlake.lockFile.to_string());
 
+    #if 0
     emitTreeAttrs(
         state,
-        *lockedFlake.flake.sourceInfo,
+        //*lockedFlake.flake.sourceInfo,
         lockedFlake.flake.lockedRef.input,
         *vRootSrc,
         false,
         lockedFlake.flake.forceDirty);
+    #endif
+
+    throw UnimplementedError("callFlake");
 
     vRootSubdir->mkString(lockedFlake.flake.lockedRef.subdir);
 
@@ -734,7 +742,8 @@ Fingerprint LockedFlake::getFingerprint() const
     // flake.sourceInfo.storePath for the fingerprint.
     return hashString(htSHA256,
         fmt("%s;%s;%d;%d;%s",
-            flake.sourceInfo->storePath.to_string(),
+            "FIXME",
+            //flake.sourceInfo->storePath.to_string(),
             flake.lockedRef.subdir,
             flake.lockedRef.input.getRevCount().value_or(0),
             flake.lockedRef.input.getLastModified().value_or(0),

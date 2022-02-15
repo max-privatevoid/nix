@@ -227,4 +227,10 @@ ref<MemoryInputAccessor> makeMemoryInputAccessor()
     return make_ref<MemoryInputAccessorImpl>();
 }
 
+std::string_view SourcePath::baseName() const
+{
+    // FIXME
+    return path == "" || path == "/" ? "source" : baseNameOf(path);
+}
+
 }

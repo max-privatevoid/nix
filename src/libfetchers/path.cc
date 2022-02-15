@@ -80,28 +80,35 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    Path getAbsPath(ref<Store> store, const Input & input)
     {
         std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
-        if (path[0] != '/') {
-            if (!input.parent)
-                throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
+        if (path[0] == '/')
+            return path;
 
-            auto parent = canonPath(*input.parent);
+        if (!input.parent)
+            throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
 
-            // the path isn't relative, prefix it
-            absPath = nix::absPath(path, parent);
+        auto parent = canonPath(*input.parent);
 
-            // for security, ensure that if the parent is a store path, it's inside it
-            if (store->isInStore(parent)) {
-                auto storePath = store->printStorePath(store->toStorePath(parent).first);
-                if (!isDirOrInDir(absPath, storePath))
-                    throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
-            }
-        } else
-            absPath = path;
+        // the path isn't relative, prefix it
+        absPath = nix::absPath(path, parent);
+
+        // for security, ensure that if the parent is a store path, it's inside it
+        if (store->isInStore(parent)) {
+            auto storePath = store->printStorePath(store->toStorePath(parent).first);
+            if (!isDirOrInDir(absPath, storePath))
+                throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
+        }
+
+        return absPath;
+    }
+
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    {
+        auto absPath = getAbsPath(store, input);
 
         Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
 
@@ -116,6 +123,14 @@ struct PathInputScheme : InputScheme
             storePath = store->addToStore("source", absPath);
 
         return {std::move(*storePath), input};
+    }
+
+    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input) override
+    {
+        auto absPath = getAbsPath(store, input);
+        auto input2(input);
+        input2.attrs.emplace("path", absPath);
+        return {makeFSInputAccessor(absPath), std::move(input2)};
     }
 };
 
